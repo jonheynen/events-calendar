@@ -671,10 +671,9 @@ function renderCalendar() {
         const pill = document.createElement('div');
         pill.className = 'event-pill';
         pill.textContent = ev.emoji + ' ' + ev.title;
-        pill.addEventListener('click', (e) => {
-          e.stopPropagation();
-          showPopup(ev, pill);
-        });
+        pill.addEventListener('mouseenter', () => { cancelHide(); showPopup(ev, pill); });
+        pill.addEventListener('mouseleave', () => scheduleHide(200));
+        pill.addEventListener('click', (e) => { e.stopPropagation(); showPopup(ev, pill); });
         pillsWrap.appendChild(pill);
       });
 
@@ -714,51 +713,81 @@ function populatePopup(event) {
   document.getElementById('popupLink').href = event.link || '#';
 }
 
+// ── Bridge element: invisible overlay that fills the gap between anchor and popup ──
+const bridge = document.createElement('div');
+bridge.style.cssText = 'position:fixed;z-index:999;background:transparent;pointer-events:auto;display:none;';
+document.body.appendChild(bridge);
+
+let hideTimer = null;
+
+function cancelHide() { clearTimeout(hideTimer); }
+
+function scheduleHide(delay) {
+  cancelHide();
+  hideTimer = setTimeout(hidePopup, delay || 200);
+}
+
 function positionPopupByAnchor(anchor) {
-  // Use the anchor element's bounding box to place popup reliably
   const rect = anchor.getBoundingClientRect();
   const pw = 300;
   const ph = Math.min(popup.scrollHeight || 420, 420);
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const margin = 8;
+  const gap = 10; // px gap between anchor and popup
 
   // Prefer right of anchor; flip left if no room
-  let x = rect.right + margin;
-  if (x + pw > vw - margin) x = rect.left - pw - margin;
-  // Clamp to viewport horizontally
-  x = Math.max(margin, Math.min(x, vw - pw - margin));
+  let x = rect.right + gap;
+  let openRight = true;
+  if (x + pw > vw - 8) { x = rect.left - pw - gap; openRight = false; }
+  x = Math.max(8, Math.min(x, vw - pw - 8));
 
-  // Align top of popup with top of anchor; shift up if it would go off bottom
+  // Align top with anchor top; shift up if off bottom
   let y = rect.top;
-  if (y + ph > vh - margin) y = vh - ph - margin;
-  y = Math.max(margin, y);
+  if (y + ph > vh - 8) y = vh - ph - 8;
+  y = Math.max(8, y);
 
   popup.style.left = x + 'px';
   popup.style.top = y + 'px';
   popup.scrollTop = 0;
+
+  // Position bridge to fill the gap between anchor and popup
+  const popupRect = { left: x, top: y, right: x + pw, bottom: y + ph };
+  if (openRight) {
+    bridge.style.left = rect.right + 'px';
+    bridge.style.width = gap + 'px';
+  } else {
+    bridge.style.left = (rect.left - gap) + 'px';
+    bridge.style.width = gap + 'px';
+  }
+  const bridgeTop = Math.min(rect.top, popupRect.top);
+  const bridgeBottom = Math.max(rect.bottom, popupRect.bottom);
+  bridge.style.top = bridgeTop + 'px';
+  bridge.style.height = (bridgeBottom - bridgeTop) + 'px';
+  bridge.style.display = 'block';
 }
 
 function showPopup(event, anchor) {
+  cancelHide();
   populatePopup(event);
   popup.classList.add('visible');
-  justOpened = true; // flag to block the same click from closing it
-  requestAnimationFrame(() => {
-    positionPopupByAnchor(anchor);
-    // Clear the flag after the click event has fully propagated
-    setTimeout(() => { justOpened = false; }, 0);
-  });
+  requestAnimationFrame(() => positionPopupByAnchor(anchor));
 }
 
 function hidePopup() {
   popup.classList.remove('visible');
+  bridge.style.display = 'none';
 }
 
-let justOpened = false;
+// Popup stays open while mouse is inside it
+popup.addEventListener('mouseenter', cancelHide);
+popup.addEventListener('mouseleave', () => scheduleHide(200));
 
-// Only close when clicking truly outside — never on the same click that opened it
+// Bridge keeps popup alive while mouse crosses the gap
+bridge.addEventListener('mouseenter', cancelHide);
+bridge.addEventListener('mouseleave', () => scheduleHide(200));
+
+// Click outside closes popup
 document.addEventListener('click', (e) => {
-  if (justOpened) return;
   if (!popup.contains(e.target) && !e.target.closest('.event-pill') && !e.target.closest('.event-list-item')) {
     hidePopup();
   }
@@ -796,10 +825,9 @@ function renderEventList(events) {
       </div>
       <div class="event-list-dot"></div>
     `;
-    item.addEventListener('click', (e) => {
-      e.stopPropagation();
-      showPopup(ev, item);
-    });
+    item.addEventListener('mouseenter', () => { cancelHide(); showPopup(ev, item); });
+    item.addEventListener('mouseleave', () => scheduleHide(200));
+    item.addEventListener('click', (e) => { e.stopPropagation(); showPopup(ev, item); });
     list.appendChild(item);
   });
 }
