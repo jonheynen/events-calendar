@@ -742,16 +742,23 @@ function positionPopupByAnchor(anchor) {
 function showPopup(event, anchor) {
   populatePopup(event);
   popup.classList.add('visible');
-  // Position after visible so scrollHeight is populated
-  requestAnimationFrame(() => positionPopupByAnchor(anchor));
+  justOpened = true; // flag to block the same click from closing it
+  requestAnimationFrame(() => {
+    positionPopupByAnchor(anchor);
+    // Clear the flag after the click event has fully propagated
+    setTimeout(() => { justOpened = false; }, 0);
+  });
 }
 
 function hidePopup() {
   popup.classList.remove('visible');
 }
 
-// Close when clicking outside
+let justOpened = false;
+
+// Only close when clicking truly outside — never on the same click that opened it
 document.addEventListener('click', (e) => {
+  if (justOpened) return;
   if (!popup.contains(e.target) && !e.target.closest('.event-pill') && !e.target.closest('.event-list-item')) {
     hidePopup();
   }
