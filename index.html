@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Events Calendar</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f6f3;
+    --surface: #ffffff;
+    --border: #e2dfd8;
+    --text-primary: #1a1a1a;
+    --text-secondary: #6b6560;
+    --text-muted: #a09990;
+    --accent: #1e4d8c;
+    --accent-light: #eef2f9;
+    --accent-hover: #163b6e;
+    --event-dot: #c8372d;
+    --today-bg: #1e4d8c;
+    --today-text: #ffffff;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.12);
+    --shadow-lg: 0 12px 40px rgba(0,0,0,0.18);
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 32px 16px;
+  }
+
+  .calendar-wrapper {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    gap: 12px;
+  }
+
+  .cal-title-block h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  .cal-title-block p {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+
+  .month-nav {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .month-nav button {
+    background: none;
+    border: none;
+    width: 38px;
+    height: 38px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .month-nav button:hover {
+    background: var(--accent-light);
+    color: var(--accent);
+  }
+
+  .month-nav .month-label {
+    padding: 0 16px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+    height: 38px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Grid */
+  .cal-grid {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  .day-labels {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    background: var(--accent);
+  }
+
+  .day-label {
+    text-align: center;
+    padding: 10px 4px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.85);
+  }
+
+  .days-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+  }
+
+  .day-cell {
+    min-height: 90px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 6px 6px;
+    position: relative;
+    cursor: default;
+    transition: background 0.1s;
+  }
+
+  .day-cell:nth-child(7n) { border-right: none; }
+  .day-cell:nth-last-child(-n+7) { border-bottom: none; }
+
+  .day-cell.other-month { background: #faf9f7; }
+  .day-cell.other-month .day-num { color: var(--text-muted); }
+  .day-cell.has-events { cursor: pointer; }
+  .day-cell.has-events:hover { background: var(--accent-light); }
+
+  .day-num {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    line-height: 1;
+    margin-bottom: 5px;
+  }
+
+  .day-cell.today .day-num {
+    background: var(--today-bg);
+    color: var(--today-text);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.75rem;
+  }
+
+  /* Event pills */
+  .event-pills { display: flex; flex-direction: column; gap: 2px; }
+
+  .event-pill {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--accent-light);
+    border-left: 2px solid var(--accent);
+    border-radius: 0 3px 3px 0;
+    padding: 2px 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    position: relative;
+  }
+
+  .event-pill:hover { background: var(--accent); color: #fff; }
+
+  .more-pill {
+    font-size: 0.625rem;
+    color: var(--text-muted);
+    padding: 1px 5px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .more-pill:hover { color: var(--accent); }
+
+  /* Hover tooltip / popup */
+  .event-popup {
+    position: fixed;
+    z-index: 1000;
+    width: 280px;
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(6px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+
+  .event-popup.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .popup-img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    display: block;
+    background: var(--accent-light);
+  }
+
+  .popup-img-placeholder {
+    width: 100%;
+    height: 140px;
+    background: linear-gradient(135deg, var(--accent) 0%, #2d6bbf 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+  }
+
+  .popup-body {
+    padding: 14px 16px 16px;
+  }
+
+  .popup-category {
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 5px;
+  }
+
+  .popup-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.3;
+    margin-bottom: 8px;
+  }
+
+  .popup-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 10px;
+  }
+
+  .popup-meta-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .popup-meta-icon { flex-shrink: 0; margin-top: 1px; }
+
+  .popup-desc {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+  }
+
+  .popup-footer {
+    padding: 0 16px 14px;
+    display: flex;
+    gap: 8px;
+  }
+
+  .popup-btn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+    text-decoration: none;
+    border: none;
+    transition: background 0.15s;
+  }
+
+  .popup-btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .popup-btn-primary:hover { background: var(--accent-hover); }
+
+  .popup-btn-secondary {
+    background: var(--accent-light);
+    color: var(--accent);
+  }
+  .popup-btn-secondary:hover { background: #dce7f5; }
+
+  /* Event list below */
+  .upcoming-section {
+    margin-top: 28px;
+  }
+
+  .upcoming-section h2 {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    padding-left: 2px;
+  }
+
+  .event-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .event-list-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    cursor: pointer;
+    transition: box-shadow 0.15s, border-color 0.15s;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .event-list-item:hover {
+    box-shadow: var(--shadow-md);
+    border-color: #c5d5ef;
+  }
+
+  .event-list-date {
+    flex-shrink: 0;
+    width: 44px;
+    text-align: center;
+    background: var(--accent-light);
+    border-radius: 6px;
+    padding: 6px 4px;
+  }
+
+  .event-list-date .month { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+  .event-list-date .day { font-size: 1.25rem; font-weight: 700; color: var(--accent); line-height: 1; }
+
+  .event-list-info { flex: 1; min-width: 0; }
+  .event-list-title { font-size: 0.875rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .event-list-sub { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
+
+  .event-list-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--event-dot);
+    flex-shrink: 0;
+  }
+
+  /* Legend / edit note */
+  .edit-hint {
+    margin-top: 20px;
+    padding: 12px 16px;
+    background: #fffbeb;
+    border: 1px solid #f0d060;
+    border-radius: var(--radius);
+    font-size: 0.75rem;
+    color: #7a6010;
+    line-height: 1.5;
+  }
+
+  .edit-hint strong { color: #5a4508; }
+
+  @media (max-width: 600px) {
+    body { padding: 16px 8px; }
+    .cal-header { flex-direction: column; align-items: flex-start; }
+    .day-cell { min-height: 60px; padding: 5px 3px 3px; }
+    .day-label { font-size: 0.5625rem; padding: 8px 2px; }
+    .event-pill { display: none; }
+    .day-cell.has-events::after {
+      content: '';
+      display: block;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--event-dot);
+      margin: 3px auto 0;
+    }
+    .event-popup { width: 240px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .event-popup { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="calendar-wrapper">
+
+  <div class="cal-header">
+    <div class="cal-title-block">
+      <h1>Upcoming Events</h1>
+      <p>Click any event to see details</p>
+    </div>
+    <div class="month-nav">
+      <button id="prevBtn" aria-label="Previous month">&#8249;</button>
+      <div class="month-label" id="monthLabel"></div>
+      <button id="nextBtn" aria-label="Next month">&#8250;</button>
+    </div>
+  </div>
+
+  <div class="cal-grid">
+    <div class="day-labels">
+      <div class="day-label">Mon</div>
+      <div class="day-label">Tue</div>
+      <div class="day-label">Wed</div>
+      <div class="day-label">Thu</div>
+      <div class="day-label">Fri</div>
+      <div class="day-label">Sat</div>
+      <div class="day-label">Sun</div>
+    </div>
+    <div class="days-grid" id="daysGrid"></div>
+  </div>
+
+  <div class="upcoming-section">
+    <h2>This Month</h2>
+    <div class="event-list" id="eventList"></div>
+  </div>
+
+  <div class="edit-hint">
+    <strong>To add or edit events:</strong> Open this HTML file in any text editor, find the <code>const EVENTS = [</code> section near the top of the &lt;script&gt; tag, and update the event objects. Each event has a title, date, time, location, description, category, emoji, and optional image URL.
+  </div>
+
+</div>
+
+<!-- Hover Popup -->
+<div class="event-popup" id="eventPopup">
+  <div id="popupImgWrap"></div>
+  <div class="popup-body">
+    <div class="popup-category" id="popupCategory"></div>
+    <div class="popup-title" id="popupTitle"></div>
+    <div class="popup-meta" id="popupMeta"></div>
+    <div class="popup-desc" id="popupDesc"></div>
+  </div>
+  <div class="popup-footer">
+    <a class="popup-btn popup-btn-primary" id="popupLink" href="#">More Info</a>
+    <button class="popup-btn popup-btn-secondary" id="popupClose">Close</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  EVENTS DATA — Edit this section to add/change events
+//  Date format: "YYYY-MM-DD"
+//  image: use a URL string, or "" to use the emoji placeholder
+// ============================================================
+const EVENTS = [
+  {
+    id: 1,
+    title: "Marion County Town Hall – Budget Discussion",
+    date: "2026-06-10",
+    time: "6:00 PM – 8:00 PM",
+    location: "Salem Civic Center, Room 104",
+    description: "Join the Board of Commissioners for a public town hall on the proposed FY2027 budget. Community input is welcome. Interpretation services available upon request.",
+    category: "Public Meeting",
+    emoji: "🏛️",
+    image: "",
+    link: "#"
+  },
+  {
+    id: 2,
+    title: "Community Resource Fair",
+    date: "2026-06-14",
+    time: "10:00 AM – 2:00 PM",
+    location: "Chemeketa Community College – Gym",
+    description: "Connect with 40+ local service providers offering health screenings, housing assistance, employment resources, and more. Free and open to all Marion County residents.",
+    category: "Community Event",
+    emoji: "🤝",
+    image: "",
+    link: "#"
+  },
+  {
+    id: 3,
+    title: "Willamette Valley Nature Walk",
+    date: "2026-06-19",
+    time: "8:00 AM – 10:30 AM",
+    location: "Minto-Brown Island Park, Salem",
+    description: "A guided 3-mile nature walk along the Willamette River. Learn about local flora and fauna from a Marion County Parks naturalist. Bring water and comfortable shoes.",
+    category: "Parks & Recreation",
+    emoji: "🌿",
+    image: "",
+    link: "#"
+  },
+  {
+    id: 4,
+    title: "Board of Commissioners – Regular Session",
+    date: "2026-06-24",
+    time: "9:00 AM – 12:00 PM",
+    location: "Marion County Courthouse, Rm 100",
+    description: "Regular session of the Marion County Board of Commissioners. Agenda and materials available 72 hours prior at MarionCounty.gov. Public comment period included.",
+    category: "Public Meeting",
+    emoji: "📋",
+    image: "",
+    link: "#"
+  },
+  {
+    id: 5,
+    title: "Senior Health & Wellness Expo",
+    date: "2026-06-26",
+    time: "9:00 AM – 1:00 PM",
+    location: "Turner Community Center",
+    description: "Free health screenings, fitness demonstrations, Medicare counseling, and lunch for adults 55+. Hosted by Marion County Health & Human Services.",
+    category: "Health & Wellness",
+    emoji: "❤️",
+    image: "",
+    link: "#"
+  },
+  {
+    id: 6,
+    title: "Planning Commission Hearing",
+    date: "2026-07-07",
+    time: "5:30 PM – 8:00 PM",
+    location: "County Administrative Building",
+    description: "Public hearing on proposed zone changes in the rural transition area near Brooks. Affected property owners will receive individual notice. All residents welcome.",
+    category: "Public Meeting",
+    emoji: "🗺️",
+    image: "",
+    link: "#"
+  },
+  {
+    id: 7,
+    title: "4th of July Celebration – Riverfront Park",
+    date: "2026-07-04",
+    time: "4:00 PM – 10:00 PM",
+    location: "Riverfront Park, Salem",
+    description: "Annual Independence Day celebration with live music, food vendors, and a fireworks show at dusk. Free admission. Sponsored by Marion County Parks.",
+    category: "Community Event",
+    emoji: "🎆",
+    image: "",
+    link: "#"
+  },
+  {
+    id: 8,
+    title: "Ride the Willamette – Community Bike Ride",
+    date: "2026-07-11",
+    time: "7:30 AM – 11:00 AM",
+    location: "Riverfront Park – Pavilion",
+    description: "A family-friendly 10-mile guided bike ride along the Willamette River Greenway. Helmets required. Bike rentals available on-site. Register by July 8th.",
+    category: "Parks & Recreation",
+    emoji: "🚴",
+    image: "",
+    link: "#"
+  }
+];
+// ============================================================
+//  END EVENTS DATA
+// ============================================================
+
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const today = new Date();
+let currentYear = today.getFullYear();
+let currentMonth = today.getMonth(); // 0-indexed
+
+const popup = document.getElementById('eventPopup');
+let popupTimeout = null;
+let activeTarget = null;
+
+function eventsForMonth(year, month) {
+  return EVENTS.filter(e => {
+    const d = new Date(e.date + 'T00:00:00');
+    return d.getFullYear() === year && d.getMonth() === month;
+  });
+}
+
+function renderCalendar() {
+  document.getElementById('monthLabel').textContent = MONTHS[currentMonth] + ' ' + currentYear;
+
+  const grid = document.getElementById('daysGrid');
+  grid.innerHTML = '';
+
+  // First day of month (0=Sun, adjust to Mon-start)
+  const firstDay = new Date(currentYear, currentMonth, 1);
+  let startDow = firstDay.getDay(); // 0=Sun
+  startDow = (startDow === 0) ? 6 : startDow - 1; // Convert to Mon=0
+
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const daysInPrev = new Date(currentYear, currentMonth, 0).getDate();
+
+  const totalCells = Math.ceil((startDow + daysInMonth) / 7) * 7;
+
+  const monthEvents = eventsForMonth(currentYear, currentMonth);
+
+  for (let i = 0; i < totalCells; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'day-cell';
+
+    let dayNum, cellDate, isOther = false;
+
+    if (i < startDow) {
+      dayNum = daysInPrev - startDow + i + 1;
+      cellDate = new Date(currentYear, currentMonth - 1, dayNum);
+      isOther = true;
+    } else if (i >= startDow + daysInMonth) {
+      dayNum = i - startDow - daysInMonth + 1;
+      cellDate = new Date(currentYear, currentMonth + 1, dayNum);
+      isOther = true;
+    } else {
+      dayNum = i - startDow + 1;
+      cellDate = new Date(currentYear, currentMonth, dayNum);
+    }
+
+    if (isOther) cell.classList.add('other-month');
+
+    // Today highlight
+    if (cellDate.toDateString() === today.toDateString()) {
+      cell.classList.add('today');
+    }
+
+    const numEl = document.createElement('div');
+    numEl.className = 'day-num';
+    numEl.textContent = dayNum;
+    cell.appendChild(numEl);
+
+    // Events for this day
+    const dateStr = cellDate.toISOString().split('T')[0];
+    const dayEvents = EVENTS.filter(e => e.date === dateStr);
+
+    if (dayEvents.length) {
+      cell.classList.add('has-events');
+      const pillsWrap = document.createElement('div');
+      pillsWrap.className = 'event-pills';
+
+      const max = 2;
+      dayEvents.slice(0, max).forEach(ev => {
+        const pill = document.createElement('div');
+        pill.className = 'event-pill';
+        pill.textContent = ev.emoji + ' ' + ev.title;
+        pill.addEventListener('mouseenter', (e) => showPopup(e, ev, pill));
+        pill.addEventListener('mouseleave', () => scheduleHide());
+        pill.addEventListener('click', (e) => { e.stopPropagation(); showPopup(e, ev, pill); });
+        pillsWrap.appendChild(pill);
+      });
+
+      if (dayEvents.length > max) {
+        const more = document.createElement('div');
+        more.className = 'event-pill more-pill';
+        more.textContent = `+${dayEvents.length - max} more`;
+        pillsWrap.appendChild(more);
+      }
+
+      cell.appendChild(pillsWrap);
+
+      cell.addEventListener('mouseenter', (e) => {
+        if (dayEvents.length === 1) showPopup(e, dayEvents[0], cell);
+      });
+      cell.addEventListener('mouseleave', () => scheduleHide());
+    }
+
+    grid.appendChild(cell);
+  }
+
+  renderEventList(monthEvents);
+}
+
+function showPopup(e, event, anchor) {
+  clearTimeout(popupTimeout);
+  activeTarget = anchor;
+
+  // Populate
+  const imgWrap = document.getElementById('popupImgWrap');
+  if (event.image) {
+    imgWrap.innerHTML = `<img class="popup-img" src="${event.image}" alt="${event.title}" loading="lazy">`;
+  } else {
+    imgWrap.innerHTML = `<div class="popup-img-placeholder">${event.emoji}</div>`;
+  }
+
+  document.getElementById('popupCategory').textContent = event.category;
+  document.getElementById('popupTitle').textContent = event.title;
+
+  const d = new Date(event.date + 'T00:00:00');
+  const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  document.getElementById('popupMeta').innerHTML = `
+    <div class="popup-meta-row"><span class="popup-meta-icon">📅</span><span>${dateStr}</span></div>
+    <div class="popup-meta-row"><span class="popup-meta-icon">🕐</span><span>${event.time}</span></div>
+    <div class="popup-meta-row"><span class="popup-meta-icon">📍</span><span>${event.location}</span></div>
+  `;
+  document.getElementById('popupDesc').textContent = event.description;
+  document.getElementById('popupLink').href = event.link || '#';
+
+  popup.classList.add('visible');
+  positionPopup(e);
+}
+
+function positionPopup(e) {
+  const pw = 280, ph = 380;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let x = e.clientX + 14;
+  let y = e.clientY - 80;
+
+  if (x + pw > vw - 10) x = e.clientX - pw - 14;
+  if (y + ph > vh - 10) y = vh - ph - 10;
+  if (y < 10) y = 10;
+
+  popup.style.left = x + 'px';
+  popup.style.top = y + 'px';
+}
+
+function scheduleHide() {
+  popupTimeout = setTimeout(() => {
+    popup.classList.remove('visible');
+  }, 300);
+}
+
+popup.addEventListener('mouseenter', () => clearTimeout(popupTimeout));
+popup.addEventListener('mouseleave', () => scheduleHide());
+document.getElementById('popupClose').addEventListener('click', () => {
+  popup.classList.remove('visible');
+});
+
+document.addEventListener('click', (e) => {
+  if (!popup.contains(e.target)) popup.classList.remove('visible');
+});
+
+function renderEventList(events) {
+  const list = document.getElementById('eventList');
+  list.innerHTML = '';
+
+  if (!events.length) {
+    list.innerHTML = '<p style="font-size:0.8125rem;color:var(--text-muted);padding:8px 2px;">No events scheduled this month.</p>';
+    return;
+  }
+
+  events.sort((a,b) => a.date.localeCompare(b.date)).forEach(ev => {
+    const d = new Date(ev.date + 'T00:00:00');
+    const mo = MONTHS[d.getMonth()].slice(0,3).toUpperCase();
+    const day = d.getDate();
+
+    const item = document.createElement('div');
+    item.className = 'event-list-item';
+    item.innerHTML = `
+      <div class="event-list-date">
+        <div class="month">${mo}</div>
+        <div class="day">${day}</div>
+      </div>
+      <div class="event-list-info">
+        <div class="event-list-title">${ev.emoji} ${ev.title}</div>
+        <div class="event-list-sub">${ev.time} · ${ev.location}</div>
+      </div>
+      <div class="event-list-dot"></div>
+    `;
+    item.addEventListener('mouseenter', (e) => showPopup(e, ev, item));
+    item.addEventListener('mouseleave', () => scheduleHide());
+    list.appendChild(item);
+  });
+}
+
+document.getElementById('prevBtn').addEventListener('click', () => {
+  currentMonth--;
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  renderCalendar();
+});
+
+document.getElementById('nextBtn').addEventListener('click', () => {
+  currentMonth++;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  renderCalendar();
+});
+
+renderCalendar();
+</script>
+</body>
+</html>
