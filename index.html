@@ -600,8 +600,6 @@ let currentYear = today.getFullYear();
 let currentMonth = today.getMonth(); // 0-indexed
 
 const popup = document.getElementById('eventPopup');
-let popupTimeout = null;
-let activeTarget = null;
 
 function eventsForMonth(year, month) {
   return EVENTS.filter(e => {
@@ -673,9 +671,10 @@ function renderCalendar() {
         const pill = document.createElement('div');
         pill.className = 'event-pill';
         pill.textContent = ev.emoji + ' ' + ev.title;
-        pill.addEventListener('mouseenter', (e) => showPopup(e, ev, pill));
-        pill.addEventListener('mouseleave', () => scheduleHide());
-        pill.addEventListener('click', (e) => { e.stopPropagation(); showPopup(e, ev, pill); });
+        pill.addEventListener('click', (e) => {
+          e.stopPropagation();
+          showPopup(ev, pill);
+        });
         pillsWrap.appendChild(pill);
       });
 
@@ -687,11 +686,6 @@ function renderCalendar() {
       }
 
       cell.appendChild(pillsWrap);
-
-      cell.addEventListener('mouseenter', (e) => {
-        if (dayEvents.length === 1) showPopup(e, dayEvents[0], cell);
-      });
-      cell.addEventListener('mouseleave', () => scheduleHide());
     }
 
     grid.appendChild(cell);
@@ -700,24 +694,17 @@ function renderCalendar() {
   renderEventList(monthEvents);
 }
 
-function showPopup(e, event, anchor) {
-  clearTimeout(popupTimeout);
-  activeTarget = anchor;
-
-  // Populate
+function populatePopup(event) {
   const imgWrap = document.getElementById('popupImgWrap');
   if (event.image) {
     imgWrap.innerHTML = `<img class="popup-img" src="${event.image}" alt="${event.title}" loading="lazy">`;
   } else {
     imgWrap.innerHTML = `<div class="popup-img-placeholder">${event.emoji}</div>`;
   }
-
   document.getElementById('popupCategory').textContent = event.category;
   document.getElementById('popupTitle').textContent = event.title;
-
   const d = new Date(event.date + 'T00:00:00');
   const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-
   document.getElementById('popupMeta').innerHTML = `
     <div class="popup-meta-row"><span class="popup-meta-icon">📅</span><span>${dateStr}</span></div>
     <div class="popup-meta-row"><span class="popup-meta-icon">🕐</span><span>${event.time}</span></div>
@@ -725,69 +712,54 @@ function showPopup(e, event, anchor) {
   `;
   document.getElementById('popupDesc').textContent = event.description;
   document.getElementById('popupLink').href = event.link || '#';
-
-  popup.classList.add('visible');
-  positionPopup(e);
 }
 
-function positionPopup(e) {
-  const pw = 300, ph = 480;
-  const vw = window.innerWidth, vh = window.innerHeight;
-  let x = e.clientX + 16;
-  let y = e.clientY - 100;
+function positionPopupByAnchor(anchor) {
+  // Use the anchor element's bounding box to place popup reliably
+  const rect = anchor.getBoundingClientRect();
+  const pw = 300;
+  const ph = Math.min(popup.scrollHeight || 420, 420);
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const margin = 8;
 
-  if (x + pw > vw - 10) x = e.clientX - pw - 16;
-  if (y + ph > vh - 10) y = vh - ph - 10;
-  if (y < 10) y = 10;
+  // Prefer right of anchor; flip left if no room
+  let x = rect.right + margin;
+  if (x + pw > vw - margin) x = rect.left - pw - margin;
+  // Clamp to viewport horizontally
+  x = Math.max(margin, Math.min(x, vw - pw - margin));
+
+  // Align top of popup with top of anchor; shift up if it would go off bottom
+  let y = rect.top;
+  if (y + ph > vh - margin) y = vh - ph - margin;
+  y = Math.max(margin, y);
 
   popup.style.left = x + 'px';
   popup.style.top = y + 'px';
-  popup.scrollTop = 0; // reset scroll on reopen
+  popup.scrollTop = 0;
 }
 
-let isPinned = false;
-
-function scheduleHide() {
-  if (isPinned) return; // don't hide if pinned by click
-  popupTimeout = setTimeout(() => {
-    popup.classList.remove('visible');
-    popup.classList.remove('pinned');
-  }, 600); // longer delay gives time to move mouse into popup
+function showPopup(event, anchor) {
+  populatePopup(event);
+  popup.classList.add('visible');
+  // Position after visible so scrollHeight is populated
+  requestAnimationFrame(() => positionPopupByAnchor(anchor));
 }
 
-function pinPopup() {
-  isPinned = true;
-  popup.classList.add('pinned');
-  clearTimeout(popupTimeout);
-}
-
-function unpinPopup() {
-  isPinned = false;
-  popup.classList.remove('pinned');
-}
-
-popup.addEventListener('mouseenter', () => {
-  clearTimeout(popupTimeout); // cancel hide when mouse enters popup
-});
-popup.addEventListener('mouseleave', () => {
-  if (!isPinned) scheduleHide();
-});
-
-// Clicking an event pill pins the popup open
-document.addEventListener('click', (e) => {
-  if (e.target.closest('.event-pill') || e.target.closest('.event-list-item')) {
-    pinPopup();
-    return;
-  }
-  if (!popup.contains(e.target)) {
-    unpinPopup();
-    popup.classList.remove('visible');
-  }
-});
-
-document.getElementById('popupClose').addEventListener('click', () => {
-  unpinPopup();
+function hidePopup() {
   popup.classList.remove('visible');
+}
+
+// Close when clicking outside
+document.addEventListener('click', (e) => {
+  if (!popup.contains(e.target) && !e.target.closest('.event-pill') && !e.target.closest('.event-list-item')) {
+    hidePopup();
+  }
+});
+
+document.getElementById('popupClose').addEventListener('click', (e) => {
+  e.stopPropagation();
+  hidePopup();
 });
 
 function renderEventList(events) {
@@ -817,8 +789,10 @@ function renderEventList(events) {
       </div>
       <div class="event-list-dot"></div>
     `;
-    item.addEventListener('mouseenter', (e) => showPopup(e, ev, item));
-    item.addEventListener('mouseleave', () => scheduleHide());
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showPopup(ev, item);
+    });
     list.appendChild(item);
   });
 }
