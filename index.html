@@ -213,16 +213,24 @@
   .event-popup {
     position: fixed;
     z-index: 1000;
-    width: 280px;
+    width: 300px;
+    max-height: 480px;
     background: var(--surface);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--border);
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     opacity: 0;
     pointer-events: none;
     transform: translateY(6px);
     transition: opacity 0.18s ease, transform 0.18s ease;
+    scroll-behavior: smooth;
+  }
+
+  .event-popup.pinned {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-lg), 0 0 0 2px var(--accent-light);
   }
 
   .event-popup.visible {
@@ -415,7 +423,7 @@
       background: var(--event-dot);
       margin: 3px auto 0;
     }
-    .event-popup { width: 240px; }
+    .event-popup { width: 260px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -723,33 +731,63 @@ function showPopup(e, event, anchor) {
 }
 
 function positionPopup(e) {
-  const pw = 280, ph = 380;
+  const pw = 300, ph = 480;
   const vw = window.innerWidth, vh = window.innerHeight;
-  let x = e.clientX + 14;
-  let y = e.clientY - 80;
+  let x = e.clientX + 16;
+  let y = e.clientY - 100;
 
-  if (x + pw > vw - 10) x = e.clientX - pw - 14;
+  if (x + pw > vw - 10) x = e.clientX - pw - 16;
   if (y + ph > vh - 10) y = vh - ph - 10;
   if (y < 10) y = 10;
 
   popup.style.left = x + 'px';
   popup.style.top = y + 'px';
+  popup.scrollTop = 0; // reset scroll on reopen
 }
+
+let isPinned = false;
 
 function scheduleHide() {
+  if (isPinned) return; // don't hide if pinned by click
   popupTimeout = setTimeout(() => {
     popup.classList.remove('visible');
-  }, 300);
+    popup.classList.remove('pinned');
+  }, 600); // longer delay gives time to move mouse into popup
 }
 
-popup.addEventListener('mouseenter', () => clearTimeout(popupTimeout));
-popup.addEventListener('mouseleave', () => scheduleHide());
-document.getElementById('popupClose').addEventListener('click', () => {
-  popup.classList.remove('visible');
+function pinPopup() {
+  isPinned = true;
+  popup.classList.add('pinned');
+  clearTimeout(popupTimeout);
+}
+
+function unpinPopup() {
+  isPinned = false;
+  popup.classList.remove('pinned');
+}
+
+popup.addEventListener('mouseenter', () => {
+  clearTimeout(popupTimeout); // cancel hide when mouse enters popup
+});
+popup.addEventListener('mouseleave', () => {
+  if (!isPinned) scheduleHide();
 });
 
+// Clicking an event pill pins the popup open
 document.addEventListener('click', (e) => {
-  if (!popup.contains(e.target)) popup.classList.remove('visible');
+  if (e.target.closest('.event-pill') || e.target.closest('.event-list-item')) {
+    pinPopup();
+    return;
+  }
+  if (!popup.contains(e.target)) {
+    unpinPopup();
+    popup.classList.remove('visible');
+  }
+});
+
+document.getElementById('popupClose').addEventListener('click', () => {
+  unpinPopup();
+  popup.classList.remove('visible');
 });
 
 function renderEventList(events) {
