@@ -134,17 +134,19 @@
 
   .days-grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 
   .day-cell {
     min-height: 90px;
+    min-width: 0;
     border-right: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
     padding: 8px 6px 6px;
     position: relative;
     cursor: default;
     transition: background 0.1s;
+    overflow: hidden;
   }
 
   .day-cell:nth-child(7n) { border-right: none; }
@@ -449,13 +451,13 @@
 
   <div class="cal-grid">
     <div class="day-labels">
+      <div class="day-label">Sun</div>
       <div class="day-label">Mon</div>
       <div class="day-label">Tue</div>
       <div class="day-label">Wed</div>
       <div class="day-label">Thu</div>
       <div class="day-label">Fri</div>
       <div class="day-label">Sat</div>
-      <div class="day-label">Sun</div>
     </div>
     <div class="days-grid" id="daysGrid"></div>
   </div>
@@ -614,10 +616,9 @@ function renderCalendar() {
   const grid = document.getElementById('daysGrid');
   grid.innerHTML = '';
 
-  // First day of month (0=Sun, adjust to Mon-start)
+  // First day of month — Sunday-start (0=Sun, 1=Mon, ... 6=Sat)
   const firstDay = new Date(currentYear, currentMonth, 1);
-  let startDow = firstDay.getDay(); // 0=Sun
-  startDow = (startDow === 0) ? 6 : startDow - 1; // Convert to Mon=0
+  const startDow = firstDay.getDay(); // 0=Sun already correct for Sunday-start grid
 
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const daysInPrev = new Date(currentYear, currentMonth, 0).getDate();
